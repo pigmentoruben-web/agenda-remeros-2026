@@ -12,9 +12,8 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .task-done { text-decoration: line-through; color: #94a3b8; }
-    /* Animación de destello al mover */
     @keyframes highlightPulse {
-      0% { background-color: #fef08a; } /* Amarillo claro */
+      0% { background-color: #fef08a; }
       100% { background-color: transparent; }
     }
     .highlight-move {
@@ -83,7 +82,16 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'crs_pigmento_mobile_v9';
+    const STORAGE_KEY = 'crs_pigmento_mobile_v10';
+
+    // Checklist base reutilizable para adultos y funcionarios
+    const defaultCierresTasks = [
+      { id: 'c1', c: 'Gestión', w: 'Jonathan / Rodrigo', t: 'Relevar costos e ingresos de la edición anterior' },
+      { id: 'c2', c: 'Gestión', w: 'Álvaro', t: 'Presentar a Directiva y definir presupuesto y condiciones' },
+      { id: 'c3', c: 'Proveedores', w: 'Club / Camila', t: 'Cerrar servicio de cantina y opciones gastronómicas' },
+      { id: 'c4', c: 'Proveedores', w: 'Jonathan', t: 'Contratar sonido, iluminación, seguridad y control de ingreso' },
+      { id: 'c5', c: 'Audiovisual', w: 'Pigmento', t: 'Diseñar gráfica y lanzar plan de comunicación' }
+    ];
 
     const BASE_EVENTS = [
       {
@@ -180,28 +188,30 @@
         ]
       },
       {
-        id: 'cierres',
-        tab: '4. Adultos y Funcionarios',
-        title: '4. Despedida Adultos (11/12) y Funcionarios',
-        date: 'Adultos: Vie 11/12 (a aprobar) | Funcionarios: A confirmar',
-        time: 'Adultos: Noche | Funcionarios: Mediodía en Piscina',
-        place: 'Instalaciones del Club',
-        status: 'Sujeto a aprobación / Encaminado',
-        tasks: [
-          { id: 'c1', c: 'Gestión', w: 'Jonathan / Rodrigo', t: 'Adultos (11/12): Relevar costos e ingresos de la fiesta del año pasado' },
-          { id: 'c2', c: 'Gestión', w: 'Álvaro', t: 'Adultos (11/12): Presentar a Directiva y definir rápido si se hace (~300 personas, +18)' },
-          { id: 'c3', c: 'Proveedores', w: 'Club / Camila', t: 'Adultos (11/12): Si se aprueba, cerrar DJ, seguridad, cantina (Camila) y pizzas' },
-          { id: 'c4', c: 'Gestión', w: 'Álvaro / Rodrigo', t: 'Funcionarios: Confirmar fecha y hora (mediodía) que ya fijó el Club' },
-          { id: 'c5', c: 'Proveedores', w: 'Club / Camila', t: 'Funcionarios: Definir menú simple con Camila y buscar show apto para piscina' },
-          { id: 'c6', c: 'Gestión', w: 'Administración', t: 'Funcionarios: Definir regalos renovados, sorteos y lanzar invitación interna' },
-          { id: 'c7', c: 'Gestión', w: 'Florencia / Álvaro', t: 'Confirmar si el "Reconocimiento deportivo adicional" se hace o se descarta' }
-        ]
+        id: 'adultos',
+        tab: '4. Fiesta Adultos',
+        title: '4. Fiesta de Despedida de Adultos',
+        date: 'Viernes 11 de Diciembre de 2026',
+        time: 'Noche',
+        place: 'Instalaciones del Club (~300 personas)',
+        status: 'Sujeto a aprobación',
+        tasks: defaultCierresTasks.map(t => ({ ...t, id: 'ad_' + t.id }))
+      },
+      {
+        id: 'funcionarios',
+        tab: '5. Funcionarios',
+        title: '5. Fiesta de Funcionarios',
+        date: '31 de Diciembre de 2026',
+        time: 'A confirmar',
+        place: 'Sector Piscina del Club',
+        status: 'Actividad encaminada',
+        tasks: defaultCierresTasks.map(t => ({ ...t, id: 'fn_' + t.id }))
       }
     ];
 
     let state = { doneIds: [], custom: {}, meta: {}, deletedIds: [], editedTexts: {}, order: {} };
     let activeTab = 'resumen';
-    let lastMovedId = null; // Para controlar la tarea resaltada
+    let lastMovedId = null;
 
     const BADGE_COLORS = {
       'Urgente': 'bg-rose-100 text-rose-800 border-rose-200',
@@ -287,10 +297,9 @@
       ids[targetIndex] = temp;
 
       state.order[eventId] = ids;
-      lastMovedId = taskId; // Marcar esta tarea como la movida
+      lastMovedId = taskId;
       save();
 
-      // Quitar el resaltado a los 2 segundos
       setTimeout(() => {
         if (lastMovedId === taskId) {
           lastMovedId = null;
