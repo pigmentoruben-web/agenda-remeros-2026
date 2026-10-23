@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Agenda Remeros + Pigmento</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; -webkit-tap-highlight-color: transparent; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .task-done { text-decoration: line-through; color: #94a3b8; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased pb-28">
+
+  <!-- HEADER FIJO -->
+  <header class="bg-slate-900 text-white sticky top-0 z-30 shadow-lg">
+    <div class="max-w-xl mx-auto px-4 pt-3 pb-2.5">
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500 text-slate-950">Pigmento + CRS</span>
+          <h1 class="text-base font-bold leading-tight mt-1">Agenda Eventos 2026</h1>
+        </div>
+
+        <div class="text-right min-w-[120px] bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+          <div class="flex justify-between items-center text-[11px] mb-1">
+            <span class="text-slate-400">Total</span>
+            <span id="global-pct" class="font-bold text-emerald-400">0%</span>
+          </div>
+          <div class="w-full bg-slate-700 h-1.5 rounded-full overflow-hidden">
+            <div id="global-bar" class="bg-emerald-400 h-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PESTAÑAS -->
+      <div class="flex overflow-x-auto no-scrollbar gap-1.5 pt-3 pb-1 -mx-4 px-4" id="tabs-bar">
+        <!-- Renderizado por JS -->
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENIDO PRINCIPAL -->
+  <main class="max-w-xl mx-auto px-3 pt-3">
+    <div id="sync-banner" class="hidden mb-3 bg-emerald-600 text-white text-xs font-medium px-3.5 py-2.5 rounded-xl shadow flex items-center justify-between">
+      <span>✅ ¡Tablero actualizado con el link del grupo!</span>
+      <button onclick="document.getElementById('sync-banner').classList.add('hidden')" class="font-bold ml-2">✕</button>
+    </div>
+
+    <div id="main-view" class="space-y-4">
+      <!-- Renderizado por JS -->
+    </div>
+  </main>
+
+  <!-- BARRA INFERIOR FIJA -->
+  <div class="fixed bottom-0 inset-x-0 bg-white/95 backdrop-blur border-t border-slate-200 p-3 z-40 shadow-2xl">
+    <div class="max-w-xl mx-auto flex items-center gap-2">
+      <button onclick="shareWhatsApp()" class="flex-1 bg-emerald-600 active:bg-emerald-700 text-white font-semibold text-xs sm:text-sm py-3 px-4 rounded-xl shadow-md flex items-center justify-center gap-2 transition">
+        <span>📲 Compartir Avance al Grupo</span>
+      </button>
+      <button onclick="copyResumen()" class="bg-slate-100 text-slate-700 font-semibold text-xs py-3 px-3.5 rounded-xl border border-slate-300 transition shrink-0">
+        📋 Resumen
+      </button>
+      <button onclick="resetBoard()" class="bg-slate-100 text-slate-400 hover:text-rose-600 text-xs py-3 px-3 rounded-xl border border-slate-200 transition shrink-0">
+        ↺
+      </button>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-xs font-medium px-4 py-2.5 rounded-full shadow-lg hidden z-50 whitespace-nowrap">
+    Copiado al portapapeles
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'crs_pigmento_mobile_v7';
+
+    const BASE_EVENTS = [
+      {
+        id: 'urgentes',
+        tab: '⚡ Destrabar Ya',
+        title: 'Prioridades de esta Semana (Destraban el resto)',
+        date: '23 al 30 de Octubre',
+        time: 'Inmediato',
+        place: 'Equipo Pigmento + Club',
+        status: 'Prioridad Inmediata',
+        tasks: [
+          { id: 'u1', c: 'Urgente', w: 'Soledad / Álvaro', t: 'Validar con Presidencia: invitados Pozo Termal, fecha Funcionarios y si se hace Fiesta Adultos (11/12)' },
+          { id: 'u2', c: 'Urgente', w: 'Noe / Rodrigo', t: 'Llamar a Pablo y a Juan Andrés por disponibilidad Jueves 12/11 (Pozo Termal)' },
+          { id: 'u3', c: 'Urgente', w: 'Noe / Club', t: 'Chequear cierres de colegios (Mié 2/12) y consultar gimnasio Club Nacional (Plan B)' },
+          { id: 'u4', c: 'Urgente', w: 'Florencia / F. Dondo', t: 'Reunión Tenis: definir si arranca Jue 26/11 y horarios de Pablo Cuevas el Vie 27/11' },
+          { id: 'u5', c: 'Urgente', w: 'Rubén / Iván', t: 'Conseguir manual de marca Itaú y contacto de validación para rediseñar logo' },
+          { id: 'u6', c: 'Urgente', w: 'Santiago / Florencia', t: 'Medir espacio en canchas nuevas para cotizar tribunas altas y carpa' },
+          { id: 'u7', c: 'Urgente', w: 'Soledad / Noe', t: 'Pasar a Jonathan (Admin) listado técnico del Club de Fiesta para pedir presupuestos' }
+        ]
+      },
+      {
+        id: 'pozo',
+        tab: '1. Pozo Termal',
+        title: '1. Charla y Muestra del Pozo Termal',
+        date: 'Jueves 12 Nov (Backup: Jue 19/11)',
+        time: 'Tarde / Noche (no chocar con Coro)',
+        place: 'Sala de Trofeos (muestra queda 15 días)',
+        status: 'Fecha preferida a confirmar',
+        tasks: [
+          { id: 'p1', c: 'Gestión', w: 'Noe / Club', t: 'Confirmar a Pablo (prioritario), consultar rol de Paula y evaluar a Ricardo Rojas' },
+          { id: 'p2', c: 'Gestión', w: 'Soledad / Álvaro', t: 'Validar con Presidencia apellidos de exdirectivos y representante actual' },
+          { id: 'p3', c: 'Gestión', w: 'Noe / Club', t: 'Cerrar fecha definitiva (12/11 o 19/11) y horario sin chocar con el Coro' },
+          { id: 'p4', c: 'Gestión', w: 'Soledad / Club', t: 'Definir moderador: Juan Andrés (preferido), Soledad o Rodrigo' },
+          { id: 'p5', c: 'Gestión', w: 'Soledad / Noe', t: 'Armar guion del moderador con preguntas iniciales rompe-hielo' },
+          { id: 'p6', c: 'Proveedores', w: 'Santiago / Pigmento', t: 'Revisar Sala de Trofeos: medir vidrieras y definir fijación simple de láminas' },
+          { id: 'p7', c: 'Diseño', w: 'Rubén / Soledad', t: 'Seleccionar fotos digitalizadas por etapa y redactar breves epígrafes' },
+          { id: 'p8', c: 'Diseño', w: 'Rubén', t: 'Diseñar láminas / soportes livianos y mandar a imprimir' },
+          { id: 'p9', c: 'Audiovisual', w: 'Iván', t: 'Adaptar fotos históricas para rotar en las pantallas internas del Club' },
+          { id: 'p10', c: 'Audiovisual', w: 'Iván / Rubén', t: 'Armar video / secuencia documental sencilla para proyectar en la charla' },
+          { id: 'p11', c: 'Audiovisual', w: 'Pigmento', t: 'Lanzar convocatoria y difusión a socios' }
+        ]
+      },
+      {
+        id: 'tenis',
+        tab: '2. Tenis + Cuevas',
+        title: '2. Inauguración Canchas + Copa Itaú + Cuevas',
+        date: 'Jue 26 al Dom 29 de Noviembre',
+        time: 'Vie 27 (~19h Acto + Exhibición + VIP) | Sáb 28 mañana',
+        place: 'Canchas Nuevas + Carpa Social',
+        status: 'Fin de semana previsto',
+        tasks: [
+          { id: 't1', c: 'Gestión', w: 'Florencia / F. Dondo', t: 'Cerrar fixture torneo: inicio Jue 26, finales Sáb 28 y Dom 29 libre por lluvias' },
+          { id: 't2', c: 'Gestión', w: 'Florencia / Álvaro', t: 'Confirmar horarios Cuevas: Vie 27 (corte cinta, exhibición ~19h, VIP) y Sáb 28 (planteles)' },
+          { id: 't3', c: 'Gestión', w: 'Soledad / Álvaro', t: 'Armar protocolo del Acto Inaugural (corte de cinta y pelotazos simbólicos)' },
+          { id: 't4', c: 'Proveedores', w: 'Santiago / Florencia', t: 'Medir aforo real y cotizar/conseguir tribunas altas (tipo carnaval)' },
+          { id: 't5', c: 'Gestión', w: 'Club / Pigmento', t: 'Fijar cupo de exhibición, reservas VIP y retiro de entradas físicas gratis para socios' },
+          { id: 't6', c: 'Gestión', w: 'Club / Pigmento', t: 'Definir lista del Tercer Tiempo (~50 personas) y evaluar sorteo de cupos para socios' },
+          { id: 't7', c: 'Proveedores', w: 'Jonathan / Santiago', t: 'Cotizar Carpa, mobiliario e iluminación para todo el fin de semana' },
+          { id: 't8', c: 'Proveedores', w: 'Club / Pigmento', t: 'Cerrar canje con proveedor gastronómico (mesa de fiambres y bocados)' },
+          { id: 't9', c: 'Proveedores', w: 'Jonathan / Club', t: 'Contratar personal de servicio/bandejeo para atender la carpa' },
+          { id: 't10', c: 'Proveedores', w: 'Club / César', t: 'Gestionar bebidas con César (El Revoltijo) u otros: agua, refrescos y cerveza sin alcohol' },
+          { id: 't11', c: 'Gestión', w: 'Club / Pigmento', t: 'Contactar auspiciantes del Club para ofrecer lonas, remeras y activaciones' },
+          { id: 't12', c: 'Diseño', w: 'Rubén / Soledad', t: 'Rediseñar identidad Copa Itaú (con pelota histórica) y aprobar con marketing Itaú' },
+          { id: 't13', c: 'Diseño', w: 'Rubén', t: 'Diseñar y producir nuevas lonas de canchas ordenando marcas' },
+          { id: 't14', c: 'Diseño', w: 'Rubén / Jonathan', t: 'Diseñar y producir remeras del torneo (staff, invitados y Pablo Cuevas)' },
+          { id: 't15', c: 'Diseño', w: 'Rubén', t: 'Diseñar e imprimir entradas físicas para retiro de socios' },
+          { id: 't16', c: 'Audiovisual', w: 'Iván / Soledad', t: 'Campaña de difusión (masiva exhibición / privada VIP) y cobertura del fin de semana' }
+        ]
+      },
+      {
+        id: 'fiesta',
+        tab: '3. Club de Fiesta',
+        title: '3. Club de Fiesta 2026 (110 Años)',
+        date: 'Miércoles 2 de Diciembre',
+        time: 'Tarde / Noche (a confirmar)',
+        place: 'Plan A: Campus | Plan B: Gimnasio Club Nacional',
+        status: 'Propuesta con buena aceptación',
+        tasks: [
+          { id: 'f1', c: 'Gestión', w: 'Noe / Florencia', t: 'Confirmar que el Mié 2/12 no choque con actos de colegios' },
+          { id: 'f2', c: 'Gestión', w: 'Álvaro / Santiago', t: 'Reservar Plan B (Club Nacional) por alerta amarilla y chequear sillas en piso deportivo' },
+          { id: 'f3', c: 'Gestión', w: 'Florencia', t: 'Armar orden de premiación de escuelas, medallas y Cuadro de Honor' },
+          { id: 'f4', c: 'Gestión', w: 'Club / Pigmento', t: 'Cambiar sorteos lentos por premios directos a la participación en juegos/bailes' },
+          { id: 'f5', c: 'Proveedores', w: 'Jonathan / Santiago', t: 'Cotizar paquete integral: Escenario + Pantalla Gigante + Sillas + Montaje' },
+          { id: 'f6', c: 'Proveedores', w: 'Jonathan / Pigmento', t: 'Cotizar Sonido y Luces exigiendo saber quién será el musicalizador/DJ infantil' },
+          { id: 'f7', c: 'Proveedores', w: 'Santiago / Iván', t: 'Asegurar Generador eléctrico para escenario y backups de sonido/proyección' },
+          { id: 'f8', c: 'Audiovisual', w: 'Pigmento / Jonathan', t: 'Contratar fotógrafo general y exigir doble sistema de grabación de respaldo (audio/video)' },
+          { id: 'f9', c: 'Proveedores', w: 'Pigmento / Jonathan', t: 'Contratar fotógrafo exclusivo para Spot 110 años (entrega impresa y digital ordenada)' },
+          { id: 'f10', c: 'Proveedores', w: 'Pigmento / Club', t: 'Cotizar Pelotas Gigantes / inflables deportivos para ambientación y juegos' },
+          { id: 'f11', c: 'Proveedores', w: 'Club / Pigmento', t: 'Coordinar Ajedrez gigante, Pintacaritas, inflable chicos y recreadores' },
+          { id: 'f12', c: 'Proveedores', w: 'Jonathan / Club', t: 'Definir comida infantil limpia (sin pop): helados, fruta, snacks o panchos + bebida' },
+          { id: 'f13', c: 'Diseño', w: 'Rubén', t: 'Diseñar base del Mural Colectivo 110 años y producir soporte + pinturas para niños' },
+          { id: 'f14', c: 'Diseño', w: 'Rubén', t: 'Diseñar Marco de Fotos 110 años, globos impresos 110 años y placas de pantalla' },
+          { id: 'f15', c: 'Audiovisual', w: 'Iván / Soledad', t: 'Lanzar comunicación a familias y plan de aviso rápido si pasa a Plan B' }
+        ]
+      },
+      {
+        id: 'cierres',
+        tab: '4. Adultos y Funcionarios',
+        title: '4. Despedida Adultos (11/12) y Funcionarios',
+        date: 'Adultos: Vie 11/12 (a aprobar) | Funcionarios: A confirmar',
+        time: 'Adultos: Noche | Funcionarios: Mediodía en Piscina',
+        place: 'Instalaciones del Club',
+        status: 'Sujeto a aprobación / Encaminado',
+        tasks: [
+          { id: 'c1', c: 'Gestión', w: 'Jonathan / Rodrigo', t: 'Adultos (11/12): Relevar costos e ingresos de la fiesta del año pasado' },
+          { id: 'c2', c: 'Gestión', w: 'Álvaro', t: 'Adultos (11/12): Presentar a Directiva y definir rápido si se hace (~300 personas, +18)' },
+          { id: 'c3', c: 'Proveedores', w: 'Club / Camila', t: 'Adultos (11/12): Si se aprueba, cerrar DJ, seguridad, cantina (Camila) y pizzas' },
+          { id: 'c4', c: 'Gestión', w: 'Álvaro / Rodrigo', t: 'Funcionarios: Confirmar fecha y hora (mediodía) que ya fijó el Club' },
+          { id: 'c5', c: 'Proveedores', w: 'Club / Camila', t: 'Funcionarios: Definir menú simple con Camila y buscar show apto para piscina' },
+          { id: 'c6', c: 'Gestión', w: 'Administración', t: 'Funcionarios: Definir regalos renovados, sorteos y lanzar invitación interna' },
+          { id: 'c7', c: 'Gestión', w: 'Florencia / Álvaro', t: 'Confirmar si el "Reconocimiento deportivo adicional" se hace o se descarta' }
+        ]
+      }
+    ];
+
+    let state = { doneIds: [], custom: {}, meta: {}, deletedIds: [], editedTexts: {} };
+    let activeTab = 'resumen';
+
+    const BADGE_COLORS = {
+      'Urgente': 'bg-rose-100 text-rose-800 border-rose-200',
+      'Gestión': 'bg-blue-100 text-blue-800 border-blue-200',
+      'Proveedores': 'bg-amber-100 text-amber-800 border-amber-200',
+      'Diseño': 'bg-purple-100 text-purple-800 border-purple-200',
+      'Audiovisual': 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    };
+
+    function init() {
+      const params = new URLSearchParams(window.location.search);
+      const shared = params.get('s');
+      if (shared) {
+        try {
+          const decoded = JSON.parse(decodeURIComponent(atob(shared)));
+          if (decoded && Array.isArray(decoded.doneIds)) {
+            state = decoded;
+            if (!state.deletedIds) state.deletedIds = [];
+            if (!state.editedTexts) state.editedTexts = {};
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+            document.getElementById('sync-banner').classList.remove('hidden');
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
+        } catch (e) {}
+      } else {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          try { 
+            state = JSON.parse(saved); 
+            if (!state.deletedIds) state.deletedIds = [];
+            if (!state.editedTexts) state.editedTexts = {};
+          } catch (e) {}
+        }
+      }
+      render();
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      render();
+    }
+
+    function getEventTasks(ev) {
+      const extras = (state.custom && state.custom[ev.id]) ? state.custom[ev.id] : [];
+      const combined = [...ev.tasks, ...extras];
+      return combined
+        .filter(t => !state.deletedIds.includes(t.id))
+        .map(t => {
+          const customText = state.editedTexts[t.id];
+          return customText !== undefined ? { ...t, t: customText } : t;
+        });
+    }
+
+    function getEventMeta(ev) {
+      const m = (state.meta && state.meta[ev.id]) ? state.meta[ev.id] : {};
+      return {
+        date: m.date || ev.date,
+        time: m.time || ev.time,
+        place: m.place || ev.place
+      };
+    }
+
+    function toggleTask(taskId) {
+      const idx = state.doneIds.indexOf(taskId);
+      if (idx > -1) state.doneIds.splice(idx, 1);
+      else state.doneIds.push(taskId);
+      save();
+    }
+
+    function deleteTask(taskId) {
+      if (!confirm('¿Eliminar esta tarea de la agenda?')) return;
+      if (!state.deletedIds.includes(taskId)) {
+        state.deletedIds.push(taskId);
+      }
+      save();
+    }
+
+    function updateTaskText(taskId, newText) {
+      const val = newText.trim();
+      if (!val) return;
+      state.editedTexts[taskId] = val;
+      save();
+    }
+
+    function updateMeta(eventId, field, val) {
+      if (!state.meta[eventId]) state.meta[eventId] = {};
+      state.meta[eventId][field] = val;
+      save();
+    }
+
+    function addCustomTask(eventId) {
+      const tInput = document.getElementById('new-t');
+      const wInput = document.getElementById('new-w');
+      const cInput = document.getElementById('new-c');
+      const text = tInput.value.trim();
+      if (!text) return;
+
+      if (!state.custom[eventId]) state.custom[eventId] = [];
+      const newId = 'x_' + Date.now().toString(36);
+      state.custom[eventId].push({
+        id: newId,
+        c: cInput.value,
+        w: wInput.value.trim() || 'Equipo',
+        t: text
+      });
+      tInput.value = '';
+      wInput.value = '';
+      save();
+    }
+
+    function setTab(id) {
+      activeTab = id;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function render() {
+      let total = 0;
+      let done = 0;
+      BASE_EVENTS.forEach(ev => {
+        const tasks = getEventTasks(ev);
+        total += tasks.length;
+        tasks.forEach(t => { if (state.doneIds.includes(t.id)) done++; });
+      });
+      const pct = total ? Math.round((done / total) * 100) : 0;
+      document.getElementById('global-pct').textContent = `${pct}% (${done}/${total})`;
+      document.getElementById('global-bar').style.width = `${pct}%`;
+
+      const tabsBar = document.getElementById('tabs-bar');
+      let tabsHtml = `
+        <button onclick="setTab('resumen')" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+          activeTab === 'resumen' ? 'bg-white text-slate-950 shadow' : 'bg-slate-800 text-slate-300'
+        }">
+          <span>📅 Listado General</span>
+        </button>
+      `;
+
+      BASE_EVENTS.forEach(ev => {
+        const tasks = getEventTasks(ev);
+        const evDone = tasks.filter(t => state.doneIds.includes(t.id)).length;
+        const isCurrent = ev.id === activeTab;
+        const allDone = tasks.length > 0 && evDone === tasks.length;
+
+        tabsHtml += `
+          <button onclick="setTab('${ev.id}')" class="shrink-0 px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+            isCurrent ? 'bg-white text-slate-950 shadow' : 'bg-slate-800 text-slate-300'
+          }">
+            <span>${ev.tab}</span>
+            <span class="text-[10px] px-1.5 py-0.5 rounded-full ${
+              allDone ? 'bg-emerald-500 text-slate-950 font-bold' : isCurrent ? 'bg-slate-200 text-slate-800' : 'bg-slate-700 text-slate-300'
+            }">${evDone}/${tasks.length}</span>
+          </button>
+        `;
+      });
+      tabsBar.innerHTML = tabsHtml;
+
+      const mainView = document.getElementById('main-view');
+
+      if (activeTab === 'resumen') {
+        let html = `
+          <div class="space-y-3">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Resumen Ejecutivo</span>
+              <h2 class="text-base font-bold text-slate-900 mt-1">Cronograma de Eventos 2026</h2>
+              <p class="text-xs text-slate-500 mt-0.5">Toca cualquier evento para ver, marcar, editar o eliminar tareas.</p>
+            </div>
+        `;
+
+        BASE_EVENTS.forEach(ev => {
+          const tasks = getEventTasks(ev);
+          const evDone = tasks.filter(t => state.doneIds.includes(t.id)).length;
+          const evPct = tasks.length ? Math.round((evDone / tasks.length) * 100) : 0;
+          const meta = getEventMeta(ev);
+
+          html += `
+            <div onclick="setTab('${ev.id}')" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 active:bg-slate-50 cursor-pointer transition">
+              <div class="flex items-start justify-between gap-2 mb-2">
+                <div>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-700">${ev.status}</span>
+                  <h3 class="text-sm font-bold text-slate-900 mt-1">${ev.title}</h3>
+                </div>
+                <span class="text-xs font-bold px-2 py-1 rounded-lg bg-slate-100 text-slate-700 shrink-0">
+                  ${evPct}%
+                </span>
+              </div>
+              <div class="text-xs text-slate-600 space-y-1 mt-2 border-t border-slate-100 pt-2">
+                <div>📅 <b>Fecha:</b> ${meta.date}</div>
+                <div>⏰ <b>Hora:</b> ${meta.time}</div>
+                <div>📍 <b>Lugar:</b> ${meta.place}</div>
+              </div>
+              <div class="mt-3 flex items-center justify-between text-xs text-emerald-600 font-semibold">
+                <span>Ver checklist y pendientes (${evDone}/${tasks.length})</span>
+                <span>→</span>
+              </div>
+            </div>
+          `;
+        });
+
+        html += `</div>`;
+        mainView.innerHTML = html;
+
+      } else {
+        const ev = BASE_EVENTS.find(e => e.id === activeTab);
+        const tasks = getEventTasks(ev);
+        const evDone = tasks.filter(t => state.doneIds.includes(t.id)).length;
+        const evPct = tasks.length ? Math.round((evDone / tasks.length) * 100) : 0;
+        const meta = getEventMeta(ev);
+
+        mainView.innerHTML = `
+          <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-4 bg-slate-50 border-b border-slate-200">
+              <div class="flex items-start justify-between gap-2 mb-3">
+                <div>
+                  <button onclick="setTab('resumen')" class="text-xs font-semibold text-blue-600 mb-1 inline-block">← Volver al Listado General</button>
+                  <h2 class="text-base font-bold text-slate-900 leading-snug">${ev.title}</h2>
+                </div>
+                <span class="shrink-0 text-xs font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ${evPct}%
+                </span>
+              </div>
+
+              <div class="space-y-1.5 text-xs">
+                <div class="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+                  <span class="text-slate-400 font-semibold w-14 shrink-0">📅 Fecha:</span>
+                  <input type="text" value="${meta.date}" onchange="updateMeta('${ev.id}', 'date', this.value)"
+                    class="w-full font-semibold text-slate-800 bg-transparent focus:outline-none focus:bg-yellow-50 rounded" />
+                </div>
+                <div class="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+                  <span class="text-slate-400 font-semibold w-14 shrink-0">⏰ Hora:</span>
+                  <input type="text" value="${meta.time}" onchange="updateMeta('${ev.id}', 'time', this.value)"
+                    class="w-full font-semibold text-slate-800 bg-transparent focus:outline-none focus:bg-yellow-50 rounded" />
+                </div>
+                <div class="flex items-center gap-2 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200">
+                  <span class="text-slate-400 font-semibold w-14 shrink-0">📍 Lugar:</span>
+                  <input type="text" value="${meta.place}" onchange="updateMeta('${ev.id}', 'place', this.value)"
+                    class="w-full font-semibold text-slate-800 bg-transparent focus:outline-none focus:bg-yellow-50 rounded" />
+                </div>
+              </div>
+            </div>
+
+            <div class="divide-y divide-slate-100">
+              ${
+                tasks.map(t => {
+                  const isDone = state.doneIds.includes(t.id);
+                  const badge = BADGE_COLORS[t.c] || 'bg-slate-100 text-slate-700';
+                  return `
+                    <div class="p-3.5 flex items-start justify-between gap-3 transition ${isDone ? 'bg-slate-50/60' : ''}">
+                      <div class="mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 cursor-pointer transition ${
+                        isDone ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-300 bg-white'
+                      }" onclick="toggleTask('${t.id}')">
+                        ${isDone ? '✓' : ''}
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <textarea rows="2" onchange="updateTaskText('${t.id}', this.value)"
+                          class="w-full text-sm bg-transparent border border-transparent hover:border-slate-200 focus:border-slate-400 focus:bg-white rounded p-1 -m-1 resize-none focus:outline-none leading-snug ${isDone ? 'task-done' : 'text-slate-800 font-medium'}">${t.t}</textarea>
+                        <div class="flex flex-wrap items-center gap-1.5 mt-1">
+                          <span class="text-[10px] font-semibold px-2 py-0.5 rounded border ${badge}">${t.c}</span>
+                          <span class="text-[11px] text-slate-500 font-medium">👤 ${t.w}</span>
+                          <span class="text-[10px] text-slate-400 ml-1">(Toca el texto para editarlo)</span>
+                        </div>
+                      </div>
+                      <button onclick="deleteTask('${t.id}')" title="Eliminar tarea" class="text-slate-300 hover:text-rose-600 p-1 text-sm shrink-0 transition">
+                        ✕
+                      </button>
+                    </div>
+                  `;
+                }).join('')
+              }
+            </div>
+
+            <div class="p-3 bg-slate-50 border-t border-slate-200 space-y-2">
+              <div class="text-[11px] font-bold uppercase text-slate-400">Agregar tarea a este evento</div>
+              <div class="flex gap-2">
+                <select id="new-c" class="text-xs bg-white border border-slate-200 rounded-lg px-2 py-2 flex-1">
+                  <option value="Gestión">📋 Gestión</option>
+                  <option value="Proveedores">🤝 Proveedores</option>
+                  <option value="Diseño">🎨 Diseño</option>
+                  <option value="Audiovisual">🎥 Audiovisual</option>
+                  <option value="Urgente">🔥 Urgente</option>
+                </select>
+                <input id="new-w" type="text" placeholder="Resp. (ej. Noe, Rubén)" class="text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-2 flex-1" />
+              </div>
+              <div class="flex gap-2">
+                <input id="new-t" type="text" placeholder="Escribir pendiente..." class="text-xs bg-white border border-slate-200 rounded-lg px-3 py-2.5 flex-1" />
+                <button onclick="addCustomTask('${ev.id}')" class="bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shrink-0">
+                  + Sumar
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function shareWhatsApp() {
+      const encoded = btoa(encodeURIComponent(JSON.stringify(state)));
+      const isWeb = window.location.protocol.startsWith('http');
+      let msg = `*Actualización Agenda Remeros + Pigmento*\n`;
+      
+      if (isWeb) {
+        const shareUrl = `${window.location.origin}${window.location.pathname}?s=${encoded}`;
+        msg += `👉 *Toca este link para ver el tablero actualizado en tu celular:*\n${shareUrl}`;
+      } else {
+        msg += buildTextSummary();
+      }
+
+      window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    }
+
+    function buildTextSummary() {
+      let lines = ['📊 *ESTADO DE EVENTOS — REMEROS + PIGMENTO*\n'];
+      BASE_EVENTS.forEach(ev => {
+        const tasks = getEventTasks(ev);
+        const done = tasks.filter(t => state.doneIds.includes(t.id)).length;
+        const pending = tasks.filter(t => !state.doneIds.includes(t.id));
+        lines.push(`*${ev.tab}* (${done}/${tasks.length} listas)`);
+        pending.slice(0, 3).forEach(p => {
+          lines.push(`  ▫️ ${p.t} _(${p.w})_`);
+        });
+        if (pending.length > 3) lines.push(`  _...y ${pending.length - 3} pendientes más_`);
+        lines.push('');
+      });
+      return lines.join('\n');
+    }
+
+    function copyResumen() {
+      const text = buildTextSummary();
+      navigator.clipboard.writeText(text).then(() => {
+        const toast = document.getElementById('toast');
+        toast.textContent = '✅ Resumen copiado para WhatsApp';
+        toast.classList.remove('hidden');
+        setTimeout(() => toast.classList.add('hidden'), 2500);
+      });
+    }
+
+    function resetBoard() {
+      if (!confirm('¿Reiniciar marcas, tareas editadas y eliminadas?')) return;
+      state = { doneIds: [], custom: {}, meta: {}, deletedIds: [], editedTexts: {} };
+      save();
+    }
+
+    init();
+  </script>
+</body>
+</html>
