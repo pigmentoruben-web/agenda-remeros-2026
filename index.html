@@ -12,6 +12,14 @@
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     .task-done { text-decoration: line-through; color: #94a3b8; }
+    /* Animación de destello al mover */
+    @keyframes highlightPulse {
+      0% { background-color: #fef08a; } /* Amarillo claro */
+      100% { background-color: transparent; }
+    }
+    .highlight-move {
+      animation: highlightPulse 2s ease-out;
+    }
   </style>
 </head>
 <body class="text-slate-800 antialiased pb-28">
@@ -75,7 +83,7 @@
   </div>
 
   <script>
-    const STORAGE_KEY = 'crs_pigmento_mobile_v8';
+    const STORAGE_KEY = 'crs_pigmento_mobile_v9';
 
     const BASE_EVENTS = [
       {
@@ -193,6 +201,7 @@
 
     let state = { doneIds: [], custom: {}, meta: {}, deletedIds: [], editedTexts: {}, order: {} };
     let activeTab = 'resumen';
+    let lastMovedId = null; // Para controlar la tarea resaltada
 
     const BADGE_COLORS = {
       'Urgente': 'bg-rose-100 text-rose-800 border-rose-200',
@@ -241,7 +250,6 @@
       const extras = (state.custom && state.custom[ev.id]) ? state.custom[ev.id] : [];
       const combined = [...ev.tasks, ...extras];
       
-      // Filtrar eliminadas y aplicar textos editados
       let tasks = combined
         .filter(t => !state.deletedIds.includes(t.id))
         .map(t => {
@@ -249,7 +257,6 @@
           return customText !== undefined ? { ...t, t: customText } : t;
         });
 
-      // Orden personalizado si existe
       if (state.order && state.order[ev.id]) {
         const orderIds = state.order[ev.id];
         tasks.sort((a, b) => {
@@ -275,13 +282,21 @@
       const targetIndex = index + direction;
       if (targetIndex < 0 || targetIndex >= ids.length) return;
 
-      // Intercambiar posiciones
       const temp = ids[index];
       ids[index] = ids[targetIndex];
       ids[targetIndex] = temp;
 
       state.order[eventId] = ids;
+      lastMovedId = taskId; // Marcar esta tarea como la movida
       save();
+
+      // Quitar el resaltado a los 2 segundos
+      setTimeout(() => {
+        if (lastMovedId === taskId) {
+          lastMovedId = null;
+          render();
+        }
+      }, 2000);
     }
 
     function getEventMeta(ev) {
@@ -337,7 +352,6 @@
         t: text
       });
 
-      // Agregar al final del orden actual
       if (!state.order[eventId]) {
         const ev = BASE_EVENTS.find(e => e.id === eventId);
         state.order[eventId] = getEventTasks(ev).map(t => t.id);
@@ -489,8 +503,11 @@
                 tasks.map((t, idx) => {
                   const isDone = state.doneIds.includes(t.id);
                   const badge = BADGE_COLORS[t.c] || 'bg-slate-100 text-slate-700';
+                  const isHighlighted = (t.id === lastMovedId);
+                  const rowClass = isHighlighted ? 'highlight-move' : (isDone ? 'bg-slate-50/60' : '');
+
                   return `
-                    <div class="p-3.5 flex items-start justify-between gap-2 transition ${isDone ? 'bg-slate-50/60' : ''}">
+                    <div class="p-3.5 flex items-start justify-between gap-2 transition ${rowClass}">
                       <!-- Botones para reordenar -->
                       <div class="flex flex-col gap-0.5 pt-1 shrink-0">
                         <button onclick="moveTask('${ev.id}', '${t.id}', -1)" title="Subir prioridad" ${idx === 0 ? 'disabled class="opacity-20 cursor-default"' : 'class="text-slate-400 hover:text-slate-700 font-bold text-xs p-0.5"'}">▲</button>
